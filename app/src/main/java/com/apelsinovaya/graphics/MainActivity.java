@@ -1,5 +1,4 @@
 package com.apelsinovaya.graphics;
-
 import android.app.Activity;
 import android.app.DatePickerDialog;
 import android.app.ProgressDialog;
@@ -45,36 +44,6 @@ public class MainActivity extends Activity {
         setGraphics();
         setFilterButtons();
         setDataForToday();
-    }
-
-    private void setGraphics() {
-        //TemperatureSRK4
-        graphTSRK4 = (GraphView) findViewById(R.id.graphTSRK4);
-        setGraphLabelTimeFormat(graphTSRK4);
-        //VoltageSRK4
-        graphVSRK4 = (GraphView) findViewById(R.id.graphVSRK4);
-        setGraphLabelTimeFormat(graphVSRK4);
-        //TemperatureSRKM
-        graphTSRKM = (GraphView) findViewById(R.id.graphTSRKM);
-        setGraphLabelTimeFormat(graphTSRKM);
-        //VoltageSRKM
-        graphVSRKM = (GraphView) findViewById(R.id.graphVSRKM);
-        setGraphLabelTimeFormat(graphVSRKM);
-    }
-
-    private void setGraphLabelTimeFormat(GraphView graph) {
-        graph.getGridLabelRenderer().setLabelFormatter(new DefaultLabelFormatter() {
-            @Override
-            public String formatLabel(double value, boolean isValueX) {
-                if (isValueX) { // dateTimeFormatter.format(new Date((long) value));
-                    Format formatter = new SimpleDateFormat(PATTERN_DATEFORMAT);
-                    return formatter.format(value);
-                }
-                return super.formatLabel(value, isValueX);
-            }
-        });
-        graph.getGridLabelRenderer().setHumanRounding(true);
-        graph.getGridLabelRenderer().setHorizontalLabelsAngle(90);
     }
 
     private void setFilterButtons() {
@@ -182,71 +151,78 @@ public class MainActivity extends Activity {
             System.out.println("srkArrayList is Empty");
         }
         if (!temperatureSRKArrayList.isEmpty()) {
-            displayGraphT(temperatureSRKArrayList, graphTSRK);
+            addSeriesOnGraphTSRK(temperatureSRKArrayList, graphTSRK);
         } else {
             System.out.println("temperatureList is empty");
             displayEmptyGraph(graphTSRK);
         }
         if (!voltageSRKArrayList.isEmpty()) {
-            displayGraphV(voltageSRKArrayList, graphVSRK);
+            addSeriesOnGraphVSRK(voltageSRKArrayList, graphVSRK);
         } else {
             System.out.println("voltageList is empty");
             displayEmptyGraph(graphVSRK);
         }
     }
 
-    private void displayGraphT(ArrayList<Temperature> temperatureArrayList, GraphView graphTSRK) {
-        LineGraphSeries<DataPoint> seriesTSRK = new LineGraphSeries<DataPoint>(setDataT(temperatureArrayList, temperatureArrayList.size()));
-        if (seriesTSRK.isEmpty()) {
-            seriesTSRK.setColor(Color.BLACK);
-            graphTSRK.addSeries(seriesTSRK);
-
-            graphTSRK.getViewport().setMinY(10);
-            graphTSRK.getViewport().setMaxY(30);
-            graphTSRK.getViewport().setYAxisBoundsManual(true);
-            graphTSRK.getViewport().setMinX(temperatureArrayList.get(0).getDateTime().getTime());
-            graphTSRK.getViewport().setMaxX(temperatureArrayList.get(temperatureArrayList.size() - 1).getDateTime().getTime());
-            graphTSRK.getViewport().setXAxisBoundsManual(true);
-        } else {
-            graphTSRK.removeAllSeries();
-            seriesTSRK.setColor(Color.BLACK);
-            graphTSRK.addSeries(seriesTSRK);
-
-            graphTSRK.getViewport().setMinY(10);
-            graphTSRK.getViewport().setMaxY(30);
-            graphTSRK.getViewport().setYAxisBoundsManual(true);
-            graphTSRK.getViewport().setMinX(temperatureArrayList.get(0).getDateTime().getTime());
-            graphTSRK.getViewport().setMaxX(temperatureArrayList.get(temperatureArrayList.size() - 1).getDateTime().getTime());
-            graphTSRK.getViewport().setXAxisBoundsManual(true);
-            graphTSRK.onDataChanged(true, true);
-        }
+    private void setGraphics() {
+        //TemperatureSRK4
+        graphTSRK4 = (GraphView) findViewById(R.id.graphTSRK4);
+        setGraphLabelFormat(graphTSRK4);
+        //VoltageSRK4
+        graphVSRK4 = (GraphView) findViewById(R.id.graphVSRK4);
+        setGraphLabelFormat(graphVSRK4);
+        //TemperatureSRKM
+        graphTSRKM = (GraphView) findViewById(R.id.graphTSRKM);
+        setGraphLabelFormat(graphTSRKM);
+        //VoltageSRKM
+        graphVSRKM = (GraphView) findViewById(R.id.graphVSRKM);
+        setGraphLabelFormat(graphVSRKM);
     }
 
-    private void displayGraphV(ArrayList<Voltage> voltageArrayList, GraphView graphVSRK) {
-        LineGraphSeries<DataPoint> seriesVSRK = new LineGraphSeries<DataPoint>(setDataV(voltageArrayList, voltageArrayList.size()));
-        if (seriesVSRK.isEmpty()) {
-            seriesVSRK.setColor(Color.BLUE);
-            graphVSRK.addSeries(seriesVSRK);
+    private void setGraphLabelFormat(GraphView graph) {
+        graph.getGridLabelRenderer().setLabelFormatter(new DefaultLabelFormatter() {
+            @Override
+            public String formatLabel(double value, boolean isValueX) {
+                if (isValueX) { // dateTimeFormatter.format(new Date((long) value));
+                    Format formatter = new SimpleDateFormat(PATTERN_DATEFORMAT);
+                    return formatter.format(new Date((long) value));
+                }
+                return super.formatLabel(value, isValueX);
+            }
+        });
+        graph.getGridLabelRenderer().setHumanRounding(true);
+        graph.getGridLabelRenderer().setHorizontalLabelsAngle(90);
 
-            graphVSRK.getViewport().setMinY(210);
-            graphVSRK.getViewport().setMaxY(230);
-            graphVSRK.getViewport().setYAxisBoundsManual(true);
-            graphVSRK.getViewport().setMinX(voltageArrayList.get(0).getDateTime().getTime());
-            graphVSRK.getViewport().setMaxX(voltageArrayList.get(voltageArrayList.size() - 1).getDateTime().getTime());
-            graphVSRK.getViewport().setXAxisBoundsManual(true);
-        } else {
-            graphVSRK.removeAllSeries();
-            seriesVSRK.setColor(Color.BLUE);
-            graphVSRK.addSeries(seriesVSRK);
+    }
 
-            graphVSRK.getViewport().setMinY(210);
-            graphVSRK.getViewport().setMaxY(230);
-            graphVSRK.getViewport().setYAxisBoundsManual(true);
-            graphVSRK.getViewport().setMinX(voltageArrayList.get(0).getDateTime().getTime());
-            graphVSRK.getViewport().setMaxX(voltageArrayList.get(voltageArrayList.size() - 1).getDateTime().getTime());
-            graphVSRK.getViewport().setXAxisBoundsManual(true);
-            graphVSRK.onDataChanged(true, true);
-        }
+    private void addSeriesOnGraphTSRK(ArrayList<Temperature> temperatureArrayList, GraphView graph) {
+        LineGraphSeries<DataPoint> series = new LineGraphSeries<DataPoint>(setDataT(temperatureArrayList, temperatureArrayList.size()));
+        series.setColor(Color.BLACK);
+        graph.getViewport().setMinY(10);
+        graph.getViewport().setMaxY(30);
+        graph.getViewport().setYAxisBoundsManual(true);
+        graph.getViewport().setMinX(temperatureArrayList.get(0).getDateTime().getTime());
+        graph.getViewport().setMaxX(temperatureArrayList.get(temperatureArrayList.size()-1).getDateTime().getTime());
+        graph.getGridLabelRenderer().setNumHorizontalLabels(7);
+        graph.getViewport().setXAxisBoundsManual(true);
+        graph.removeAllSeries();
+        graph.addSeries(series);
+        graph.onDataChanged(true, true);
+    }
+
+    private void addSeriesOnGraphVSRK(ArrayList<Voltage> voltageArrayList, GraphView graph) {
+        LineGraphSeries<DataPoint> series = new LineGraphSeries<DataPoint>(setDataV(voltageArrayList, voltageArrayList.size()));
+        series.setColor(Color.BLUE);
+        graph.getViewport().setMinY(210);
+        graph.getViewport().setMaxY(230);
+        graph.getViewport().setYAxisBoundsManual(true);
+        graph.getViewport().setMinX(voltageArrayList.get(0).getDateTime().getTime());
+        graph.getViewport().setMaxX(voltageArrayList.get(voltageArrayList.size()-1).getDateTime().getTime());
+        graph.getGridLabelRenderer().setNumHorizontalLabels(7);
+        graph.getViewport().setXAxisBoundsManual(true);
+        graph.removeAllSeries();
+        graph.addSeries(series);
+        graph.onDataChanged(true, true);
     }
 
     private void displayEmptyGraph(GraphView graph) {
