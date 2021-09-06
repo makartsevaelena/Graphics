@@ -27,7 +27,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent">
             <Button
-                    android:text="Hour"
+                    android:text="calendar"
                     android:textColor="@color/black"
                     android:layout_marginStart="5dp"
                     android:layout_marginEnd="5dp"

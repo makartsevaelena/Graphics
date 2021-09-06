@@ -1,12 +1,14 @@
 package com.apelsinovaya.graphics;
 
 import android.app.Activity;
+import android.app.DatePickerDialog;
 import android.app.ProgressDialog;
 import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.DatePicker;
 import com.jjoe64.graphview.DefaultLabelFormatter;
 import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.series.LineGraphSeries;
@@ -21,14 +23,11 @@ import java.util.List;
 
 public class MainActivity extends Activity {
     private GraphView graphTSRK4, graphVSRK4, graphTSRKM, graphVSRKM;
-    private Button buttonHour, buttonDay, buttonWeek;
+    private Button buttonHour, buttonDay, buttonDayAgo;
     private ProgressDialog progressDialog;
     private String uid;
     private int category, value;
     private Date dateTime;
-    private ArrayList<Srk> srk4ArrayList, srkmArrayList;
-    private ArrayList<Temperature> temperatureSRKArrayList;
-    private ArrayList<Voltage> voltageSRKArrayList;
     private static final long MILLIS_IN_A_DAY = 1000 * 60 * 60 * 24;
     private final String patternDateFormat = "dd.MM HH:mm";
     private final String progressDialodMessage = "Downloading data from Database";
@@ -39,11 +38,15 @@ public class MainActivity extends Activity {
     String columnLabelCategory = "IndicatorNum";
     String columnLabelValue = "IndicatorVal";
     String columnLabelSt = "St";
+    private String date;
+    DatePickerDialog.OnDateSetListener datePickerListener;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
         setFilterButtons();
         setGraphics();
         connectDBToday();
@@ -54,8 +57,23 @@ public class MainActivity extends Activity {
         buttonHour.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                connectDBHour();
+                final Calendar calendar = Calendar.getInstance();
+                datePickerListener = new DatePickerDialog.OnDateSetListener() {
+                    @Override
+                    public void onDateSet(DatePicker view, int year, int monthOfYear,
+                                          int dayOfMonth) {
+                        // TODO Auto-generated method stub
+                        calendar.set(Calendar.YEAR, year);
+                        calendar.set(Calendar.MONTH, monthOfYear);
+                        calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                        date = getDateFromCalendar(calendar);
+                        System.out.println("date: " + date);
+                        connectDBByCalendar();
+                    }
+                };
+                showWigetCalendar(calendar, datePickerListener);
             }
+
         });
 
         buttonDay = (Button) findViewById(R.id.buttonToday);
@@ -66,8 +84,8 @@ public class MainActivity extends Activity {
             }
         });
 
-        buttonWeek = (Button) findViewById(R.id.buttonDayAgo);
-        buttonWeek.setOnClickListener(new View.OnClickListener() {
+        buttonDayAgo = (Button) findViewById(R.id.buttonDayAgo);
+        buttonDayAgo.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 connectDBDayAgo();
@@ -75,18 +93,34 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void connectDBHour() {
-        ConnectHour task = new ConnectHour();
-        task.execute();
+    private void showWigetCalendar(Calendar calendar, DatePickerDialog.OnDateSetListener datePickerListener) {
+        new DatePickerDialog(this, datePickerListener, calendar
+                .get(Calendar.YEAR), calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)).show();
+    }
+
+    private String getDateFromCalendar(Calendar calendar) {
+        String myFormat = "yyyy-MM-dd";
+        SimpleDateFormat sdf = new SimpleDateFormat(myFormat);
+        String date = sdf.format(calendar.getTime());
+        return date;
     }
 
     private void connectDBToday() {
+//        LoadFromDB loadFromDB = new LoadFromDB();
+//        Thread thread = new Thread(loadFromDB);
+//        thread.start();
         ConnectToday task = new ConnectToday();
         task.execute();
     }
 
     private void connectDBDayAgo() {
         ConnectDayAgo task = new ConnectDayAgo();
+        task.execute();
+    }
+
+    private void connectDBByCalendar() {
+        ConnectByDateCalendar task = new ConnectByDateCalendar();
         task.execute();
     }
 
@@ -124,34 +158,35 @@ public class MainActivity extends Activity {
     }
 
     private void retrievingDataAndDisplayOnGraphics(ResultSet resultSet) {
-        srk4ArrayList = new ArrayList<>();
-        srkmArrayList = new ArrayList<>();
+        ArrayList<Srk> srk4ArrayList = new ArrayList<>();
+        ArrayList<Srk> srkmArrayList = new ArrayList<>();
         try {
             while (resultSet.next()) {
                 uid = resultSet.getString(columnLabelUid);
                 category = Integer.parseInt(resultSet.getString(columnLabelCategory));
                 value = Integer.parseInt(resultSet.getString(columnLabelValue));
                 dateTime = resultSet.getTimestamp(columnLabelSt);
-                sortByUid(uid);
+                sortByUid(uid, srk4ArrayList, srkmArrayList);
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
         displayDataOnGraphics(srk4ArrayList, graphTSRK4, graphVSRK4);
         displayDataOnGraphics(srkmArrayList, graphTSRKM, graphVSRKM);
     }
 
-    private void sortByUid(String uid) {
+    private void sortByUid(String uid, ArrayList<Srk> list1, ArrayList<Srk> list2) {
         if (uid.equals("SRK4")) {
-            srk4ArrayList.add(new Srk(uid, category, value, dateTime));
+            list1.add(new Srk(uid, category, value, dateTime));
         } else {
-            srkmArrayList.add(new Srk(uid, category, value, dateTime));
+            list2.add(new Srk(uid, category, value, dateTime));
         }
     }
 
     private void displayDataOnGraphics(ArrayList<Srk> srkArrayList, GraphView graphTSRK, GraphView graphVSRK) {
-        temperatureSRKArrayList = new ArrayList<>();
-        voltageSRKArrayList = new ArrayList<>();
+        ArrayList<Temperature> temperatureSRKArrayList = new ArrayList<>();
+        ArrayList<Voltage> voltageSRKArrayList = new ArrayList<>();
         if (!srkArrayList.isEmpty()) {
             for (Srk srk : srkArrayList) {
                 if (srk.getCategory() == 0) {
@@ -179,33 +214,58 @@ public class MainActivity extends Activity {
     }
 
     private void displayGraphT(ArrayList<Temperature> temperatureArrayList, GraphView graphTSRK) {
-        LineGraphSeries<DataPoint> seriesTSRK = new LineGraphSeries<DataPoint>(setDataT(temperatureArrayList, temperatureArrayList.size()));
-        seriesTSRK.setColor(Color.BLACK);
-        graphTSRK.removeAllSeries();
-        graphTSRK.onDataChanged(true, true);
-        graphTSRK.addSeries(seriesTSRK);
 
-        graphTSRK.getViewport().setMinY(10);
-        graphTSRK.getViewport().setMaxY(30);
-        graphTSRK.getViewport().setYAxisBoundsManual(true);
-        graphTSRK.getViewport().setMinX(temperatureArrayList.get(0).getDateTime().getTime());
-        graphTSRK.getViewport().setMaxX(temperatureArrayList.get(temperatureArrayList.size() - 1).getDateTime().getTime());
-        graphTSRK.getViewport().setXAxisBoundsManual(true);
+        LineGraphSeries<DataPoint> seriesTSRK = new LineGraphSeries<DataPoint>(setDataT(temperatureArrayList, temperatureArrayList.size()));
+        if (seriesTSRK.isEmpty()) {
+            seriesTSRK.setColor(Color.BLACK);
+            graphTSRK.addSeries(seriesTSRK);
+
+            graphTSRK.getViewport().setMinY(10);
+            graphTSRK.getViewport().setMaxY(30);
+            graphTSRK.getViewport().setYAxisBoundsManual(true);
+            graphTSRK.getViewport().setMinX(temperatureArrayList.get(0).getDateTime().getTime());
+            graphTSRK.getViewport().setMaxX(temperatureArrayList.get(temperatureArrayList.size() - 1).getDateTime().getTime());
+            graphTSRK.getViewport().setXAxisBoundsManual(true);
+        } else {
+            graphTSRK.removeAllSeries();
+            seriesTSRK.setColor(Color.BLACK);
+            graphTSRK.addSeries(seriesTSRK);
+
+            graphTSRK.getViewport().setMinY(10);
+            graphTSRK.getViewport().setMaxY(30);
+            graphTSRK.getViewport().setYAxisBoundsManual(true);
+            graphTSRK.getViewport().setMinX(temperatureArrayList.get(0).getDateTime().getTime());
+            graphTSRK.getViewport().setMaxX(temperatureArrayList.get(temperatureArrayList.size() - 1).getDateTime().getTime());
+            graphTSRK.getViewport().setXAxisBoundsManual(true);
+            graphTSRK.onDataChanged(true, true);
+        }
     }
 
     private void displayGraphV(ArrayList<Voltage> voltageArrayList, GraphView graphVSRK) {
         LineGraphSeries<DataPoint> seriesVSRK = new LineGraphSeries<DataPoint>(setDataV(voltageArrayList, voltageArrayList.size()));
-        seriesVSRK.setColor(Color.BLUE);
-        graphVSRK.removeAllSeries();
-        graphVSRK.onDataChanged(true, true);
-        graphVSRK.addSeries(seriesVSRK);
+        if (seriesVSRK.isEmpty()) {
+            seriesVSRK.setColor(Color.BLUE);
+            graphVSRK.addSeries(seriesVSRK);
 
-        graphVSRK.getViewport().setMinY(210);
-        graphVSRK.getViewport().setMaxY(230);
-        graphVSRK.getViewport().setYAxisBoundsManual(true);
-        graphVSRK.getViewport().setMinX(voltageArrayList.get(0).getDateTime().getTime());
-        graphVSRK.getViewport().setMaxX(voltageArrayList.get(voltageArrayList.size() - 1).getDateTime().getTime());
-        graphVSRK.getViewport().setXAxisBoundsManual(true);
+            graphVSRK.getViewport().setMinY(210);
+            graphVSRK.getViewport().setMaxY(230);
+            graphVSRK.getViewport().setYAxisBoundsManual(true);
+            graphVSRK.getViewport().setMinX(voltageArrayList.get(0).getDateTime().getTime());
+            graphVSRK.getViewport().setMaxX(voltageArrayList.get(voltageArrayList.size() - 1).getDateTime().getTime());
+            graphVSRK.getViewport().setXAxisBoundsManual(true);
+        } else {
+            graphVSRK.removeAllSeries();
+            seriesVSRK.setColor(Color.BLUE);
+            graphVSRK.addSeries(seriesVSRK);
+
+            graphVSRK.getViewport().setMinY(210);
+            graphVSRK.getViewport().setMaxY(230);
+            graphVSRK.getViewport().setYAxisBoundsManual(true);
+            graphVSRK.getViewport().setMinX(voltageArrayList.get(0).getDateTime().getTime());
+            graphVSRK.getViewport().setMaxX(voltageArrayList.get(voltageArrayList.size() - 1).getDateTime().getTime());
+            graphVSRK.getViewport().setXAxisBoundsManual(true);
+            graphVSRK.onDataChanged(true, true);
+        }
     }
 
     private void displayEmptyGraph(GraphView graph) {
@@ -269,14 +329,17 @@ public class MainActivity extends Activity {
 
                 Date date = Calendar.getInstance().getTime();
                 java.sql.Date sqlDate = new java.sql.Date(date.getTime());
+                String date1 = sqlDate + " " + "00:00:00";
+                String date2 = sqlDate + " " + "23:59:59";
 
 //              Creating a Statement object
                 System.out.println("Creating statement...");
 
 //              SQL request
-                String sql = "SELECT * FROM Indicators WHERE St >= ? ORDER BY St";
+                String sql = "SELECT * FROM Indicators WHERE St BETWEEN ? AND ? ORDER BY St";
                 preparedStatement = connection.prepareStatement(sql);
-                preparedStatement.setString(1, String.valueOf(sqlDate));
+                preparedStatement.setString(1, date1);
+                preparedStatement.setString(2, date2);
 
 //              Retrieving data
                 System.out.println("Retrieving data...");
@@ -339,14 +402,17 @@ public class MainActivity extends Activity {
                 Date date = Calendar.getInstance().getTime();
                 long dayAgo = date.getTime() - MILLIS_IN_A_DAY;
                 java.sql.Date sqlDate = new java.sql.Date(dayAgo);
+                String date1 = sqlDate + " " + "00:00:00";
+                String date2 = sqlDate + " " + "23:59:59";
 
 //              Creating a Statement object
                 System.out.println("Creating statement...");
 
 //              SQL request
-                String sql = "SELECT * FROM Indicators WHERE St >= ? ORDER BY St";
+                String sql = "SELECT * FROM Indicators WHERE St BETWEEN ? AND ? ORDER BY St";
                 preparedStatement = connection.prepareStatement(sql);
-                preparedStatement.setString(1, String.valueOf(sqlDate));
+                preparedStatement.setString(1, date1);
+                preparedStatement.setString(2, date2);
 
 //              Retrieving data
                 System.out.println("Retrieving data...");
@@ -370,7 +436,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private class ConnectHour extends AsyncTask<String, Integer, String> {
+    private class ConnectByDateCalendar extends AsyncTask<String, Integer, String> {
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
@@ -406,16 +472,17 @@ public class MainActivity extends Activity {
                 System.out.println("Connecting to database...");
                 connection = DriverManager.getConnection(DATABASE_URL + USERPASS);
 
-                Date date = Calendar.getInstance().getTime();
-                java.sql.Date sqlDate = new java.sql.Date(date.getTime());
+                String date1 = date + " " + "00:00:00";
+                String date2 = date + " " + "23:59:59";
 
 //              Creating a Statement object
                 System.out.println("Creating statement...");
 
 //              SQL request
-                String sql = "SELECT * FROM Indicators WHERE St >= ? ORDER BY St";
+                String sql = "SELECT * FROM Indicators WHERE St BETWEEN ? AND ? ORDER BY St";
                 preparedStatement = connection.prepareStatement(sql);
-                preparedStatement.setString(1, String.valueOf(sqlDate));
+                preparedStatement.setString(1, date1);
+                preparedStatement.setString(2, date2);
 
 //              Retrieving data
                 System.out.println("Retrieving data...");
