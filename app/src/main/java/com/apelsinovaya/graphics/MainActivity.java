@@ -22,121 +22,41 @@ import java.util.Date;
 import java.util.List;
 
 public class MainActivity extends Activity {
+    private static final long MILLIS_IN_A_DAY = 1000 * 60 * 60 * 24;
+    private static final String PATTERN_DATEFORMAT = "dd.MM HH:mm";
+    private static final String JDBC_DRIVER = "com.mysql.jdbc.Driver";
+    private static final String DATABASE_URL = "***";
+    private static final String USERPASS = "***";
+    private static final String COLUMNLABEL_UID = "Uid";
+    private static final String COLUMNLABEL_CATEGORY = "IndicatorNum";
+    private static final String COLUMNLABEL_VALUE = "IndicatorVal";
+    private static final String COLUMNLABEL_ST = "St";
     private GraphView graphTSRK4, graphVSRK4, graphTSRKM, graphVSRKM;
-    private Button buttonHour, buttonDay, buttonDayAgo;
     private ProgressDialog progressDialog;
-    private String uid;
     private int category, value;
     private Date dateTime;
-    private static final long MILLIS_IN_A_DAY = 1000 * 60 * 60 * 24;
-    private final String patternDateFormat = "dd.MM HH:mm";
-    private final String progressDialodMessage = "Downloading data from Database";
-    static final String JDBC_DRIVER = "com.mysql.jdbc.Driver";
-    static final String DATABASE_URL = "***";
-    static final String USERPASS = "***";
-    String columnLabelUid = "Uid";
-    String columnLabelCategory = "IndicatorNum";
-    String columnLabelValue = "IndicatorVal";
-    String columnLabelSt = "St";
-    private String date;
-    DatePickerDialog.OnDateSetListener datePickerListener;
-
+    private java.sql.Date sqlDate;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        setFilterButtons();
         setGraphics();
-        connectDBToday();
-    }
-
-    private void setFilterButtons() {
-        buttonHour = (Button) findViewById(R.id.buttonHour);
-        buttonHour.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                final Calendar calendar = Calendar.getInstance();
-                datePickerListener = new DatePickerDialog.OnDateSetListener() {
-                    @Override
-                    public void onDateSet(DatePicker view, int year, int monthOfYear,
-                                          int dayOfMonth) {
-                        // TODO Auto-generated method stub
-                        calendar.set(Calendar.YEAR, year);
-                        calendar.set(Calendar.MONTH, monthOfYear);
-                        calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
-                        date = getDateFromCalendar(calendar);
-                        System.out.println("date: " + date);
-                        connectDBByCalendar();
-                    }
-                };
-                showWigetCalendar(calendar, datePickerListener);
-            }
-
-        });
-
-        buttonDay = (Button) findViewById(R.id.buttonToday);
-        buttonDay.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                connectDBToday();
-            }
-        });
-
-        buttonDayAgo = (Button) findViewById(R.id.buttonDayAgo);
-        buttonDayAgo.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                connectDBDayAgo();
-            }
-        });
-    }
-
-    private void showWigetCalendar(Calendar calendar, DatePickerDialog.OnDateSetListener datePickerListener) {
-        new DatePickerDialog(this, datePickerListener, calendar
-                .get(Calendar.YEAR), calendar.get(Calendar.MONTH),
-                calendar.get(Calendar.DAY_OF_MONTH)).show();
-    }
-
-    private String getDateFromCalendar(Calendar calendar) {
-        String myFormat = "yyyy-MM-dd";
-        SimpleDateFormat sdf = new SimpleDateFormat(myFormat);
-        String date = sdf.format(calendar.getTime());
-        return date;
-    }
-
-    private void connectDBToday() {
-//        LoadFromDB loadFromDB = new LoadFromDB();
-//        Thread thread = new Thread(loadFromDB);
-//        thread.start();
-        ConnectToday task = new ConnectToday();
-        task.execute();
-    }
-
-    private void connectDBDayAgo() {
-        ConnectDayAgo task = new ConnectDayAgo();
-        task.execute();
-    }
-
-    private void connectDBByCalendar() {
-        ConnectByDateCalendar task = new ConnectByDateCalendar();
-        task.execute();
+        setFilterButtons();
+        setDataForToday();
     }
 
     private void setGraphics() {
         //TemperatureSRK4
         graphTSRK4 = (GraphView) findViewById(R.id.graphTSRK4);
         setGraphLabelTimeFormat(graphTSRK4);
-
         //VoltageSRK4
         graphVSRK4 = (GraphView) findViewById(R.id.graphVSRK4);
         setGraphLabelTimeFormat(graphVSRK4);
-
         //TemperatureSRKM
         graphTSRKM = (GraphView) findViewById(R.id.graphTSRKM);
         setGraphLabelTimeFormat(graphTSRKM);
-
         //VoltageSRKM
         graphVSRKM = (GraphView) findViewById(R.id.graphVSRKM);
         setGraphLabelTimeFormat(graphVSRKM);
@@ -147,7 +67,7 @@ public class MainActivity extends Activity {
             @Override
             public String formatLabel(double value, boolean isValueX) {
                 if (isValueX) { // dateTimeFormatter.format(new Date((long) value));
-                    Format formatter = new SimpleDateFormat(patternDateFormat);
+                    Format formatter = new SimpleDateFormat(PATTERN_DATEFORMAT);
                     return formatter.format(value);
                 }
                 return super.formatLabel(value, isValueX);
@@ -157,21 +77,84 @@ public class MainActivity extends Activity {
         graph.getGridLabelRenderer().setHorizontalLabelsAngle(90);
     }
 
+    private void setFilterButtons() {
+        Button buttonCalendar = (Button) findViewById(R.id.buttonCalendar);
+        buttonCalendar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setDataForCalendarDay();
+            }
+        });
+        Button buttonDay = (Button) findViewById(R.id.buttonToday);
+        buttonDay.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setDataForToday();
+            }
+        });
+        Button buttonDayAgo = (Button) findViewById(R.id.buttonDayAgo);
+        buttonDayAgo.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setDataForDayAgo();
+            }
+        });
+    }
+
+    private void setDataForToday() {
+        Date today = Calendar.getInstance().getTime();
+        sqlDate = new java.sql.Date(today.getTime());
+        connectToDB();
+    }
+
+    private void setDataForDayAgo() {
+        Date today = Calendar.getInstance().getTime();
+        long dayAgo = today.getTime() - MILLIS_IN_A_DAY;
+        sqlDate = new java.sql.Date(dayAgo);
+        connectToDB();
+    }
+
+    private void setDataForCalendarDay() {
+        final Calendar calendar = Calendar.getInstance();
+        DatePickerDialog.OnDateSetListener datePickerListener = new DatePickerDialog.OnDateSetListener() {
+            @Override
+            public void onDateSet(DatePicker view, int year, int monthOfYear,
+                                  int dayOfMonth) {
+                calendar.set(Calendar.YEAR, year);
+                calendar.set(Calendar.MONTH, monthOfYear);
+                calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                sqlDate = new java.sql.Date(calendar.getTime().getTime());
+                connectToDB();
+            }
+        };
+        showWigetCalendar(calendar, datePickerListener);
+    }
+
+    private void showWigetCalendar(Calendar calendar, DatePickerDialog.OnDateSetListener datePickerListener) {
+        new DatePickerDialog(this, datePickerListener, calendar
+                .get(Calendar.YEAR), calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)).show();
+    }
+
+    private void connectToDB() {
+        ConnectToDB task = new ConnectToDB();
+        task.execute();
+    }
+
     private void retrievingDataAndDisplayOnGraphics(ResultSet resultSet) {
         ArrayList<Srk> srk4ArrayList = new ArrayList<>();
         ArrayList<Srk> srkmArrayList = new ArrayList<>();
         try {
             while (resultSet.next()) {
-                uid = resultSet.getString(columnLabelUid);
-                category = Integer.parseInt(resultSet.getString(columnLabelCategory));
-                value = Integer.parseInt(resultSet.getString(columnLabelValue));
-                dateTime = resultSet.getTimestamp(columnLabelSt);
+                String uid = resultSet.getString(COLUMNLABEL_UID);
+                category = Integer.parseInt(resultSet.getString(COLUMNLABEL_CATEGORY));
+                value = Integer.parseInt(resultSet.getString(COLUMNLABEL_VALUE));
+                dateTime = resultSet.getTimestamp(COLUMNLABEL_ST);
                 sortByUid(uid, srk4ArrayList, srkmArrayList);
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-
         displayDataOnGraphics(srk4ArrayList, graphTSRK4, graphVSRK4);
         displayDataOnGraphics(srkmArrayList, graphTSRKM, graphVSRKM);
     }
@@ -198,7 +181,6 @@ public class MainActivity extends Activity {
         } else {
             System.out.println("srkArrayList is Empty");
         }
-
         if (!temperatureSRKArrayList.isEmpty()) {
             displayGraphT(temperatureSRKArrayList, graphTSRK);
         } else {
@@ -214,7 +196,6 @@ public class MainActivity extends Activity {
     }
 
     private void displayGraphT(ArrayList<Temperature> temperatureArrayList, GraphView graphTSRK) {
-
         LineGraphSeries<DataPoint> seriesTSRK = new LineGraphSeries<DataPoint>(setDataT(temperatureArrayList, temperatureArrayList.size()));
         if (seriesTSRK.isEmpty()) {
             seriesTSRK.setColor(Color.BLACK);
@@ -291,11 +272,12 @@ public class MainActivity extends Activity {
         return values;
     }
 
-    private class ConnectToday extends AsyncTask<String, Integer, String> {
+    private class ConnectToDB extends AsyncTask<String, Integer, String> {
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
             progressDialog = new ProgressDialog(MainActivity.this);
+            String progressDialodMessage = "Downloading data from Database";
             progressDialog.setMessage(progressDialodMessage);
             progressDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
             progressDialog.setCancelable(false);
@@ -314,7 +296,6 @@ public class MainActivity extends Activity {
             String response = "response";
             Connection connection = null;
             PreparedStatement preparedStatement = null;
-
 //              Registering JDBC driver
             try {
                 System.out.println("Registering JDBC driver...");
@@ -327,163 +308,16 @@ public class MainActivity extends Activity {
                 System.out.println("Connecting to database...");
                 connection = DriverManager.getConnection(DATABASE_URL + USERPASS);
 
-                Date date = Calendar.getInstance().getTime();
-                java.sql.Date sqlDate = new java.sql.Date(date.getTime());
                 String date1 = sqlDate + " " + "00:00:00";
                 String date2 = sqlDate + " " + "23:59:59";
-
+                System.out.println("sqlDate..." + sqlDate);
 //              Creating a Statement object
                 System.out.println("Creating statement...");
-
 //              SQL request
                 String sql = "SELECT * FROM Indicators WHERE St BETWEEN ? AND ? ORDER BY St";
                 preparedStatement = connection.prepareStatement(sql);
                 preparedStatement.setString(1, date1);
                 preparedStatement.setString(2, date2);
-
-//              Retrieving data
-                System.out.println("Retrieving data...");
-                ResultSet resultSet = preparedStatement.executeQuery();
-
-                retrievingDataAndDisplayOnGraphics(resultSet);
-
-                System.out.println("Closing connection and releasing resources...");
-                resultSet.close();
-                preparedStatement.close();
-                connection.close();
-
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
-            return response;
-        }
-
-        protected void onPostExecute(String result) {
-            progressDialog.dismiss();
-        }
-    }
-
-    private class ConnectDayAgo extends AsyncTask<String, Integer, String> {
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-            progressDialog = new ProgressDialog(MainActivity.this);
-            progressDialog.setMessage(progressDialodMessage);
-            progressDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
-            progressDialog.setCancelable(false);
-            progressDialog.setIndeterminate(true);
-            progressDialog.show();
-        }
-
-        @Override
-        protected void onProgressUpdate(Integer... values) {
-            super.onProgressUpdate(values);
-            progressDialog.setProgress(values[0]);
-        }
-
-        @Override
-        protected String doInBackground(String... urls) {
-            String response = "response";
-            Connection connection = null;
-            PreparedStatement preparedStatement = null;
-
-//              Registering JDBC driver
-            try {
-                System.out.println("Registering JDBC driver...");
-                Class.forName(JDBC_DRIVER);
-            } catch (ClassNotFoundException e) {
-                e.printStackTrace();
-            }
-            try {
-//              Connecting to database
-                System.out.println("Connecting to database...");
-                connection = DriverManager.getConnection(DATABASE_URL + USERPASS);
-
-                Date date = Calendar.getInstance().getTime();
-                long dayAgo = date.getTime() - MILLIS_IN_A_DAY;
-                java.sql.Date sqlDate = new java.sql.Date(dayAgo);
-                String date1 = sqlDate + " " + "00:00:00";
-                String date2 = sqlDate + " " + "23:59:59";
-
-//              Creating a Statement object
-                System.out.println("Creating statement...");
-
-//              SQL request
-                String sql = "SELECT * FROM Indicators WHERE St BETWEEN ? AND ? ORDER BY St";
-                preparedStatement = connection.prepareStatement(sql);
-                preparedStatement.setString(1, date1);
-                preparedStatement.setString(2, date2);
-
-//              Retrieving data
-                System.out.println("Retrieving data...");
-                ResultSet resultSet = preparedStatement.executeQuery();
-
-                retrievingDataAndDisplayOnGraphics(resultSet);
-
-                System.out.println("Closing connection and releasing resources...");
-                resultSet.close();
-                preparedStatement.close();
-                connection.close();
-
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
-            return response;
-        }
-
-        protected void onPostExecute(String result) {
-            progressDialog.dismiss();
-        }
-    }
-
-    private class ConnectByDateCalendar extends AsyncTask<String, Integer, String> {
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-            progressDialog = new ProgressDialog(MainActivity.this);
-            progressDialog.setMessage(progressDialodMessage);
-            progressDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
-            progressDialog.setCancelable(false);
-            progressDialog.setIndeterminate(true);
-            progressDialog.show();
-        }
-
-        @Override
-        protected void onProgressUpdate(Integer... values) {
-            super.onProgressUpdate(values);
-            progressDialog.setProgress(values[0]);
-        }
-
-        @Override
-        protected String doInBackground(String... urls) {
-            String response = "response";
-            Connection connection = null;
-            PreparedStatement preparedStatement = null;
-
-//              Registering JDBC driver
-            try {
-                System.out.println("Registering JDBC driver...");
-                Class.forName(JDBC_DRIVER);
-            } catch (ClassNotFoundException e) {
-                e.printStackTrace();
-            }
-            try {
-//              Connecting to database
-                System.out.println("Connecting to database...");
-                connection = DriverManager.getConnection(DATABASE_URL + USERPASS);
-
-                String date1 = date + " " + "00:00:00";
-                String date2 = date + " " + "23:59:59";
-
-//              Creating a Statement object
-                System.out.println("Creating statement...");
-
-//              SQL request
-                String sql = "SELECT * FROM Indicators WHERE St BETWEEN ? AND ? ORDER BY St";
-                preparedStatement = connection.prepareStatement(sql);
-                preparedStatement.setString(1, date1);
-                preparedStatement.setString(2, date2);
-
 //              Retrieving data
                 System.out.println("Retrieving data...");
                 ResultSet resultSet = preparedStatement.executeQuery();
