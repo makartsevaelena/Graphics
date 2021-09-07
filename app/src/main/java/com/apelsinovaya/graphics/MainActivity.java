@@ -1,11 +1,14 @@
 package com.apelsinovaya.graphics;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.DatePickerDialog;
+import android.content.DialogInterface;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.DatePicker;
+import android.widget.Toast;
 import com.jjoe64.graphview.DefaultLabelFormatter;
 import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.series.LineGraphSeries;
@@ -15,7 +18,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.List;
 
 public class MainActivity extends Activity {
     private static final long MILLIS_IN_A_DAY = 1000 * 60 * 60 * 24;
@@ -33,7 +35,6 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
         setFilterButtons();
         setGraphics();
         setDataForToday();
@@ -67,9 +68,13 @@ public class MainActivity extends Activity {
         Date today = Calendar.getInstance().getTime();
         sqlDate = new java.sql.Date(today.getTime());
         connectToDB(sqlDate);
-        sortList(srkArrayList);
-        displayDataOnGraphics(srk4ArrayList,graphTSRK4,graphVSRK4);
-        displayDataOnGraphics(srkMArrayList,graphTSRKM,graphVSRKM);
+        if (!srkArrayList.isEmpty()) {
+            sortList(srkArrayList);
+            displayDataOnGraphics(srk4ArrayList, graphTSRK4, graphVSRK4);
+            displayDataOnGraphics(srkMArrayList, graphTSRKM, graphVSRKM);
+        } else {
+            showMessageNoData();
+        }
     }
 
     private void setDataForDayAgo() {
@@ -77,34 +82,50 @@ public class MainActivity extends Activity {
         long dayAgo = today.getTime() - MILLIS_IN_A_DAY;
         sqlDate = new java.sql.Date(dayAgo);
         connectToDB(sqlDate);
-        sortList(srkArrayList);
-        displayDataOnGraphics(srk4ArrayList,graphTSRK4,graphVSRK4);
-        displayDataOnGraphics(srkMArrayList,graphTSRKM,graphVSRKM);
+        if (!srkArrayList.isEmpty()) {
+            sortList(srkArrayList);
+            displayDataOnGraphics(srk4ArrayList, graphTSRK4, graphVSRK4);
+            displayDataOnGraphics(srkMArrayList, graphTSRKM, graphVSRKM);
+        } else {
+            showMessageNoData();
+        }
     }
 
     private void setDataForCalendarDay() {
         final Calendar calendar = Calendar.getInstance();
-        DatePickerDialog.OnDateSetListener datePickerListener = new DatePickerDialog.OnDateSetListener() {
+        DatePickerDialog dialog = new DatePickerDialog(this, android.R.style.Theme_Material_Dialog_MinWidth, new DatePickerDialog.OnDateSetListener() {
             @Override
-            public void onDateSet(DatePicker view, int year, int monthOfYear,
-                                  int dayOfMonth) {
+            public void onDateSet(DatePicker view, int year, int month, int dayOfMonth) {
                 calendar.set(Calendar.YEAR, year);
-                calendar.set(Calendar.MONTH, monthOfYear);
+                calendar.set(Calendar.MONTH, month);
                 calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
                 sqlDate = new java.sql.Date(calendar.getTime().getTime());
                 connectToDB(sqlDate);
-                sortList(srkArrayList);
-                displayDataOnGraphics(srk4ArrayList,graphTSRK4,graphVSRK4);
-                displayDataOnGraphics(srkMArrayList,graphTSRKM,graphVSRKM);
+                if (!srkArrayList.isEmpty()) {
+                    sortList(srkArrayList);
+                    displayDataOnGraphics(srk4ArrayList, graphTSRK4, graphVSRK4);
+                    displayDataOnGraphics(srkMArrayList, graphTSRKM, graphVSRKM);
+                } else {
+                    showMessageNoData();
+                }
             }
-        };
-        showWigetCalendar(calendar, datePickerListener);
+        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH));
+        dialog.show();
     }
 
-    private void showWigetCalendar(Calendar calendar, DatePickerDialog.OnDateSetListener datePickerListener) {
-        new DatePickerDialog(this, datePickerListener, calendar
-                .get(Calendar.YEAR), calendar.get(Calendar.MONTH),
-                calendar.get(Calendar.DAY_OF_MONTH)).show();
+    private void showMessageNoData() {
+        AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(this);
+        alertDialogBuilder.setTitle(sqlDate.toString());
+        alertDialogBuilder.setMessage("Data does not exist");
+        alertDialogBuilder.setPositiveButton(
+                "ok",
+                new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.cancel();
+                    }
+                });
+        AlertDialog alertDialog = alertDialogBuilder.create();
+        alertDialog.show();
     }
 
     private void connectToDB(java.sql.Date sqlDate) {
@@ -112,6 +133,9 @@ public class MainActivity extends Activity {
         retrieveDataFromDB.setSqlDate(sqlDate);
         Thread thread = new Thread(retrieveDataFromDB);
         thread.start();
+        Toast toast = new Toast(this);
+        toast.setText("downloading data...");
+        toast.show();
         try {
             thread.join();
         } catch (InterruptedException e) {
@@ -135,20 +159,16 @@ public class MainActivity extends Activity {
     private void sortByCategory(ArrayList<Srk> srkArrayList) {
         temperatureSRKArrayList = new ArrayList<>();
         voltageSRKArrayList = new ArrayList<>();
-        if (!srkArrayList.isEmpty()) {
-            for (Srk srk : srkArrayList) {
-                if (srk.getCategory() == 0) {
-                    temperatureSRKArrayList.add(new Temperature(srk.getValue(), srk.getDateTime()));
-                } else {
-                    voltageSRKArrayList.add(new Voltage(srk.getValue(), srk.getDateTime()));
-                }
+        for (Srk srk : srkArrayList) {
+            if (srk.getCategory() == 0) {
+                temperatureSRKArrayList.add(new Temperature(srk.getValue(), srk.getDateTime()));
+            } else {
+                voltageSRKArrayList.add(new Voltage(srk.getValue(), srk.getDateTime()));
             }
-        } else {
-            System.out.println("srkArrayList is Empty");
         }
     }
 
-    private void displayDataOnGraphics(ArrayList<Srk> srkArrayList,GraphView graphTSRK, GraphView graphVSRK) {
+    private void displayDataOnGraphics(ArrayList<Srk> srkArrayList, GraphView graphTSRK, GraphView graphVSRK) {
         sortByCategory(srkArrayList);
         if (!temperatureSRKArrayList.isEmpty()) {
             addSeriesOnGraphTSRK(temperatureSRKArrayList, graphTSRK);
@@ -192,25 +212,13 @@ public class MainActivity extends Activity {
         });
         graph.getGridLabelRenderer().setHumanRounding(true);
         graph.getGridLabelRenderer().setHorizontalLabelsAngle(90);
-
     }
 
     private void addSeriesOnGraphTSRK(ArrayList<Temperature> temperatureArrayList, GraphView graph) {
         LineGraphSeries<DataPoint> series = new LineGraphSeries<DataPoint>(setDataT(temperatureArrayList, temperatureArrayList.size()));
         series.setColor(Color.BLACK);
-        graph.getViewport().setMinY(10);
-        graph.getViewport().setMaxY(30);
-        graph.getViewport().setYAxisBoundsManual(true);
-        graph.getViewport().setMinX(temperatureArrayList.get(0).getDateTime().getTime());
-        graph.getViewport().setMaxX(temperatureArrayList.get(temperatureArrayList.size() - 1).getDateTime().getTime());
-        if (temperatureArrayList.size() < 10) {
-            graph.getGridLabelRenderer().setNumHorizontalLabels(3);
-        } else if (temperatureArrayList.size() > 900) {
-            graph.getGridLabelRenderer().setNumHorizontalLabels(10);
-        } else {
-            graph.getGridLabelRenderer().setNumHorizontalLabels(7);
-        }
-        graph.getViewport().setXAxisBoundsManual(true);
+        setYAxisViewTemperature(graph);
+        setXAxisView(temperatureArrayList.size(), temperatureArrayList.get(0).getDateTime().getTime(),temperatureArrayList.get(temperatureArrayList.size() - 1).getDateTime().getTime(),graph);
         graph.removeAllSeries();
         graph.addSeries(series);
         graph.onDataChanged(true, true);
@@ -219,30 +227,45 @@ public class MainActivity extends Activity {
     private void addSeriesOnGraphVSRK(ArrayList<Voltage> voltageArrayList, GraphView graph) {
         LineGraphSeries<DataPoint> series = new LineGraphSeries<DataPoint>(setDataV(voltageArrayList, voltageArrayList.size()));
         series.setColor(Color.BLUE);
-        graph.getViewport().setMinY(210);
-        graph.getViewport().setMaxY(230);
-        graph.getViewport().setYAxisBoundsManual(true);
-        graph.getViewport().setMinX(voltageArrayList.get(0).getDateTime().getTime());
-        graph.getViewport().setMaxX(voltageArrayList.get(voltageArrayList.size() - 1).getDateTime().getTime());
-        if (voltageArrayList.size() < 10) {
-            graph.getGridLabelRenderer().setNumHorizontalLabels(3);
-        } else if (voltageArrayList.size() > 900) {
-            graph.getGridLabelRenderer().setNumHorizontalLabels(10);
-        } else {
-            graph.getGridLabelRenderer().setNumHorizontalLabels(7);
-        }
-        graph.getViewport().setXAxisBoundsManual(true);
+        setYAxisViewVoltage(graph);
+        setXAxisView(voltageArrayList.size(), voltageArrayList.get(0).getDateTime().getTime(),voltageArrayList.get(voltageArrayList.size() - 1).getDateTime().getTime(),graph);
         graph.removeAllSeries();
         graph.addSeries(series);
         graph.onDataChanged(true, true);
     }
 
+    private void setXAxisView(int size, double minX, double maxX, GraphView graph) {
+        graph.getViewport().setMinX(minX);
+        graph.getViewport().setMaxX(maxX);
+        if (size < 10) {
+            graph.getGridLabelRenderer().setNumHorizontalLabels(3);
+        } else if (size > 900) {
+            graph.getGridLabelRenderer().setNumHorizontalLabels(10);
+        } else {
+            graph.getGridLabelRenderer().setNumHorizontalLabels(8);
+        }
+        graph.getViewport().setXAxisBoundsManual(true);
+    }
+
+    private void setYAxisViewVoltage(GraphView graph) {
+        graph.getViewport().setMinY(210);
+        graph.getViewport().setMaxY(230);
+        graph.getViewport().setYAxisBoundsManual(true);
+    }
+
+    private void setYAxisViewTemperature(GraphView graph) {
+        graph.getViewport().setMinY(10);
+        graph.getViewport().setMaxY(30);
+        graph.getViewport().setYAxisBoundsManual(true);
+    }
+
     private void displayEmptyGraph(GraphView graph) {
         graph.removeAllSeries();
         graph.onDataChanged(true, true);
+        graph.setTitle("data does not exist");
     }
 
-    private DataPoint[] setDataT(List<Temperature> temperatureArrayList, int size) {
+    private DataPoint[] setDataT(ArrayList<Temperature> temperatureArrayList, int size) {
         DataPoint[] values = new DataPoint[size];     //creating an object of type DataPoint[] of size 'n'
         for (int i = 0; i < size; i++) {
             DataPoint v = new DataPoint(temperatureArrayList.get(i).getDateTime(), temperatureArrayList.get(i).getValue());

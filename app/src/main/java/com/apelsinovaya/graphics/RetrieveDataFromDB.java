@@ -18,7 +18,6 @@ public class RetrieveDataFromDB implements Runnable {
     private java.sql.Date sqlDate;
     private ArrayList<Srk> srkArrayList;
 
-
     @Override
     public void run() {
         Connection connection = null;
@@ -37,7 +36,6 @@ public class RetrieveDataFromDB implements Runnable {
 
             String date1 = sqlDate + " " + "00:00:00";
             String date2 = sqlDate + " " + "23:59:59";
-            System.out.println("sqlDate..." + sqlDate);
 //              Creating a Statement object
             System.out.println("Creating statement...");
 //              SQL request
