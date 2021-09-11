@@ -133,8 +133,8 @@ public class MainActivity extends Activity {
         retrieveDataFromDB.setSqlDate(sqlDate);
         Thread thread = new Thread(retrieveDataFromDB);
         thread.start();
-        Toast toast = new Toast(this);
-        toast.setText("downloading data...");
+        Toast toast = Toast.makeText(getApplicationContext(),
+                "downloading data...", Toast.LENGTH_LONG);
         toast.show();
         try {
             thread.join();
