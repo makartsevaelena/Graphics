@@ -1,9 +1,12 @@
 package com.apelsinovaya.graphics;
+
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.graphics.Color;
+import android.net.ConnectivityManager;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -35,9 +38,16 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        setFilterButtons();
+
         setGraphics();
+        setFilterButtons();
         setDataForToday();
+
+    }
+
+    public boolean isNetworkAvailable(Context context) {
+        ConnectivityManager connectivityManager = ((ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE));
+        return connectivityManager.getActiveNetworkInfo() != null && connectivityManager.getActiveNetworkInfo().isConnected();
     }
 
     private void setFilterButtons() {
@@ -129,19 +139,40 @@ public class MainActivity extends Activity {
     }
 
     private void connectToDB(java.sql.Date sqlDate) {
-        retrieveDataFromDB = new RetrieveDataFromDB();
-        retrieveDataFromDB.setSqlDate(sqlDate);
-        Thread thread = new Thread(retrieveDataFromDB);
-        thread.start();
-        Toast toast = Toast.makeText(getApplicationContext(),
-                "downloading data...", Toast.LENGTH_LONG);
-        toast.show();
-        try {
-            thread.join();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        srkArrayList = new ArrayList<>();
+        if (isNetworkAvailable(this)) {
+            CheckInternetConnect checkInternetConnect = new CheckInternetConnect();
+            Thread threadCheckInternet = new Thread(checkInternetConnect);
+            threadCheckInternet.start();
+            try {
+                threadCheckInternet.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            if (checkInternetConnect.isInternetAvailable()) {
+                retrieveDataFromDB = new RetrieveDataFromDB();
+                retrieveDataFromDB.setSqlDate(sqlDate);
+                Thread thread = new Thread(retrieveDataFromDB);
+                thread.start();
+                Toast toast = Toast.makeText(getApplicationContext(),
+                        "downloading data...", Toast.LENGTH_LONG);
+                toast.show();
+                try {
+                    thread.join();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                srkArrayList = retrieveDataFromDB.getSrkArrayList();
+            } else {
+                Toast toast = Toast.makeText(getApplicationContext(),
+                        "Internet is not available", Toast.LENGTH_LONG);
+                toast.show();
+            }
+        } else {
+            Toast toast = Toast.makeText(getApplicationContext(),
+                    "Network is not available", Toast.LENGTH_LONG);
+            toast.show();
         }
-        srkArrayList = retrieveDataFromDB.getSrkArrayList();
     }
 
     private void sortList(ArrayList<Srk> srkArrayList) {
@@ -188,15 +219,19 @@ public class MainActivity extends Activity {
         //TemperatureSRK4
         graphTSRK4 = (GraphView) findViewById(R.id.graphTSRK4);
         setGraphLabelFormat(graphTSRK4);
+        setYAxisViewTemperature(graphTSRK4);
         //VoltageSRK4
         graphVSRK4 = (GraphView) findViewById(R.id.graphVSRK4);
         setGraphLabelFormat(graphVSRK4);
+        setYAxisViewVoltage(graphVSRK4);
         //TemperatureSRKM
         graphTSRKM = (GraphView) findViewById(R.id.graphTSRKM);
         setGraphLabelFormat(graphTSRKM);
+        setYAxisViewTemperature(graphTSRKM);
         //VoltageSRKM
         graphVSRKM = (GraphView) findViewById(R.id.graphVSRKM);
         setGraphLabelFormat(graphVSRKM);
+        setYAxisViewVoltage(graphVSRKM);
     }
 
     private void setGraphLabelFormat(GraphView graph) {
@@ -217,8 +252,7 @@ public class MainActivity extends Activity {
     private void addSeriesOnGraphTSRK(ArrayList<Temperature> temperatureArrayList, GraphView graph) {
         LineGraphSeries<DataPoint> series = new LineGraphSeries<DataPoint>(setDataT(temperatureArrayList, temperatureArrayList.size()));
         series.setColor(Color.BLACK);
-        setYAxisViewTemperature(graph);
-        setXAxisView(temperatureArrayList.size(), temperatureArrayList.get(0).getDateTime().getTime(),temperatureArrayList.get(temperatureArrayList.size() - 1).getDateTime().getTime(),graph);
+        setXAxisView(temperatureArrayList.size(), temperatureArrayList.get(0).getDateTime().getTime(), temperatureArrayList.get(temperatureArrayList.size() - 1).getDateTime().getTime(), graph);
         graph.removeAllSeries();
         graph.addSeries(series);
         graph.onDataChanged(true, true);
@@ -227,8 +261,7 @@ public class MainActivity extends Activity {
     private void addSeriesOnGraphVSRK(ArrayList<Voltage> voltageArrayList, GraphView graph) {
         LineGraphSeries<DataPoint> series = new LineGraphSeries<DataPoint>(setDataV(voltageArrayList, voltageArrayList.size()));
         series.setColor(Color.BLUE);
-        setYAxisViewVoltage(graph);
-        setXAxisView(voltageArrayList.size(), voltageArrayList.get(0).getDateTime().getTime(),voltageArrayList.get(voltageArrayList.size() - 1).getDateTime().getTime(),graph);
+        setXAxisView(voltageArrayList.size(), voltageArrayList.get(0).getDateTime().getTime(), voltageArrayList.get(voltageArrayList.size() - 1).getDateTime().getTime(), graph);
         graph.removeAllSeries();
         graph.addSeries(series);
         graph.onDataChanged(true, true);

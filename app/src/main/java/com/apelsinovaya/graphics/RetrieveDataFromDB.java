@@ -54,7 +54,7 @@ public class RetrieveDataFromDB implements Runnable {
                     category = Integer.parseInt(resultSet.getString(COLUMNLABEL_CATEGORY));
                     value = Integer.parseInt(resultSet.getString(COLUMNLABEL_VALUE));
                     dateTime = resultSet.getTimestamp(COLUMNLABEL_ST);
-                    srkArrayList.add(new Srk(uid,category,value,dateTime));
+                    srkArrayList.add(new Srk(uid, category, value, dateTime));
                 }
             } catch (SQLException e) {
                 e.printStackTrace();
